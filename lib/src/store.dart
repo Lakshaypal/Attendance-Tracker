@@ -154,8 +154,16 @@ class AttendanceStore extends ChangeNotifier {
     _courses.where((course) => course.electiveGroup == null),
   );
 
-  /// `E2` before `E10`, and anything unnumbered last.
+  /// Groups sort by their letters first, then numerically, so `E2` comes
+  /// before `E10` and a differently-named band such as `MOOC5` stays with its
+  /// own kind instead of landing between `E5` and `E6`.
   static int _compareGroupNames(String a, String b) {
+    final letters = RegExp(r'[^0-9]+');
+    final prefixA = letters.stringMatch(a) ?? '';
+    final prefixB = letters.stringMatch(b) ?? '';
+    final byPrefix = prefixA.compareTo(prefixB);
+    if (byPrefix != 0) return byPrefix;
+
     final numberA = int.tryParse(a.replaceAll(RegExp(r'[^0-9]'), ''));
     final numberB = int.tryParse(b.replaceAll(RegExp(r'[^0-9]'), ''));
     if (numberA != null && numberB != null) {

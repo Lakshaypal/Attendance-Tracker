@@ -114,7 +114,7 @@ lib/
     scan/                        OCR backends and the geometric grid parser
     update/                      version comparison and the GitHub release check
     ui/                          five tabs, sheets, onboarding, shared widgets
-test/                            133 tests
+test/                            135 tests
 tool/ocr_fixture/                regenerates the recorded OCR fixture
 ```
 

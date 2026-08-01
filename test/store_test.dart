@@ -297,6 +297,20 @@ void main() {
       });
     });
 
+    test('elective bands sort by name then number, not by digits alone', () {
+      final store = AttendanceStore();
+      for (final group in ['E10', 'E2', 'MOOC5', 'E6', 'E1']) {
+        store.saveCourse(code: 'X$group', name: group, electiveGroup: group);
+      }
+      expect(store.electiveGroups.map((entry) => entry.group).toList(), [
+        'E1',
+        'E2',
+        'E6',
+        'E10',
+        'MOOC5',
+      ]);
+    });
+
     test('the grid shows only the subjects you picked', () {
       final store = AttendanceStore()..loadSampleTimetable();
 
