@@ -233,6 +233,95 @@ void main() {
     expect(find.byType(NavigationBar), findsNothing);
   });
 
+  group('class details', () {
+    testWidgets('venue, teacher and notes show when you tap the class', (
+      tester,
+    ) async {
+      final slot = store.classesForWeekday(DateTime.monday).first;
+      store.saveTimetableClass(
+        existing: slot,
+        courseId: slot.courseId,
+        weekday: slot.weekday,
+        startMinute: slot.startMinute,
+        durationMinutes: slot.durationMinutes,
+        room: 'AB3107',
+        teacher: 'Dr Rao',
+        link: 'meet.example.test/room',
+        notes: 'Bring the manual',
+      );
+
+      await pumpApp(tester);
+      await tester.tap(find.text(store.courseById(slot.courseId)!.code).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('AB3107'), findsWidgets);
+      expect(find.text('Dr Rao'), findsOneWidget);
+      expect(find.text('Bring the manual'), findsOneWidget);
+      // The destination is shown in full, not hidden behind the button.
+      expect(find.text('https://meet.example.test/room'), findsOneWidget);
+      expect(find.text('Open link'), findsOneWidget);
+      // Marking still works with the details panel present.
+      expect(find.text('Attended'), findsOneWidget);
+    });
+
+    testWidgets('a class with no details shows no empty panel', (tester) async {
+      await pumpApp(tester);
+      final slot = store.classesForWeekday(DateTime.monday).first;
+      await tester.tap(find.text(store.courseById(slot.courseId)!.code).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Open link'), findsNothing);
+      expect(find.byIcon(Icons.place_outlined), findsNothing);
+      expect(find.text('Attended'), findsOneWidget);
+    });
+
+    testWidgets('an unopenable link is shown but not offered', (tester) async {
+      final slot = store.classesForWeekday(DateTime.monday).first;
+      store.saveTimetableClass(
+        existing: slot,
+        courseId: slot.courseId,
+        weekday: slot.weekday,
+        startMinute: slot.startMinute,
+        durationMinutes: slot.durationMinutes,
+        link: 'javascript:alert(1)',
+      );
+
+      await pumpApp(tester);
+      await tester.tap(find.text(store.courseById(slot.courseId)!.code).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('javascript:alert(1)'), findsOneWidget);
+      expect(find.text('Open link'), findsNothing);
+      expect(
+        find.text('This is not a web address, so it cannot be opened.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the editor reveals the extra fields on request', (
+      tester,
+    ) async {
+      await pumpApp(tester);
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Classes'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Add class'));
+      await tester.pumpAndSettle();
+
+      // Hidden until asked for, so the common case stays short.
+      expect(find.text('Venue'), findsNothing);
+      await tester.tap(find.text('Add venue, teacher or link'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Venue'), findsOneWidget);
+      expect(find.text('Teacher'), findsOneWidget);
+      expect(find.text('Link'), findsOneWidget);
+      expect(find.text('Notes'), findsOneWidget);
+    });
+  });
+
   group('the subject picker', () {
     testWidgets('groups the timetable into compulsory and elective bands', (
       tester,

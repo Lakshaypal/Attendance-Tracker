@@ -580,6 +580,10 @@ class AttendanceStore extends ChangeNotifier {
     required int startMinute,
     required int durationMinutes,
     String? title,
+    String? room,
+    String? teacher,
+    String? link,
+    String? notes,
   }) {
     final item =
         existing ??
@@ -596,6 +600,10 @@ class AttendanceStore extends ChangeNotifier {
       startMinute: startMinute,
       durationMinutes: durationMinutes,
       title: title,
+      room: room,
+      teacher: teacher,
+      link: link,
+      notes: notes,
     );
     if (existing == null) _timetable.add(item);
     _touch();

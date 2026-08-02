@@ -256,8 +256,13 @@ class _SlotTile extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w700),
         ),
         subtitle: Text(
-          [course.name, if (slot.title != null) slot.title!].join(' · '),
-          maxLines: 1,
+          [
+            course.name,
+            if (slot.title != null) slot.title!,
+            if (slot.room != null) slot.room!,
+            if (slot.teacher != null) slot.teacher!,
+          ].join(' · '),
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
         trailing: IconButton(

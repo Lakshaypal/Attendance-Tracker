@@ -523,6 +523,7 @@ class _SlotRow extends StatelessWidget {
                       [
                         formatTimeRange(slot.startMinute, slot.durationMinutes),
                         if (slot.title != null) slot.title!,
+                        if (slot.room != null) slot.room!,
                       ].join(' · '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

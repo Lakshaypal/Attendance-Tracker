@@ -135,6 +135,10 @@ class TimetableClass {
     required int startMinute,
     required int durationMinutes,
     this.title,
+    this.room,
+    this.teacher,
+    this.link,
+    this.notes,
     this.extra,
   }) : weekday = clampWeekday(weekday),
        startMinute = clampStartMinute(startMinute),
@@ -145,7 +149,22 @@ class TimetableClass {
   int weekday;
   int startMinute;
   int durationMinutes;
+
+  /// Short label shown on the block itself, e.g. `Lab` or `Tutorial`.
   String? title;
+
+  /// Where it happens — a room number, a building, a lab name.
+  String? room;
+
+  /// Who takes it.
+  String? teacher;
+
+  /// A meeting or course link. Stored as typed; [linkUri] is the sanitised
+  /// form actually used for opening.
+  String? link;
+
+  /// Anything else worth remembering about this slot.
+  String? notes;
 
   /// Fields written by a newer version of the app, carried through untouched.
   final Map<String, dynamic>? extra;
@@ -157,16 +176,71 @@ class TimetableClass {
     'startMinute',
     'durationMinutes',
     'title',
+    'room',
+    'teacher',
+    'link',
+    'notes',
   };
 
   int get endMinute => startMinute + durationMinutes;
 
+  /// True when there is anything beyond the bare time and course to show.
+  bool get hasDetails =>
+      room != null || teacher != null || link != null || notes != null;
+
+  /// The link as something safe to open, or null when it is not a usable web
+  /// address.
+  ///
+  /// A bare `meet.google.com/abc` is treated as https, but anything carrying a
+  /// non-web scheme is rejected outright rather than handed to the platform —
+  /// a `file:` or `javascript:` link must not become launchable just because
+  /// it arrived through a synced or scanned timetable. Note that naively
+  /// prefixing `https://` is not enough: `https://mailto:me@example.com`
+  /// parses as a perfectly valid web address.
+  Uri? get linkUri {
+    final raw = link?.trim();
+    if (raw == null || raw.isEmpty) return null;
+
+    final String candidate;
+    if (_webScheme.hasMatch(raw)) {
+      candidate = raw;
+    } else if (raw.contains('://')) {
+      return null; // some other protocol spelled out in full
+    } else if (_otherScheme.hasMatch(raw)) {
+      // `mailto:`, `tel:`, `javascript:` … but not a bare `host:port`, whose
+      // "scheme" would contain a dot.
+      return null;
+    } else {
+      candidate = 'https://$raw';
+    }
+
+    final parsed = Uri.tryParse(candidate);
+    if (parsed == null) return null;
+    if (parsed.scheme != 'http' && parsed.scheme != 'https') return null;
+
+    // A real destination has a real host: a dotted name, or localhost.
+    final host = parsed.host;
+    if (host.isEmpty || !_hostShape.hasMatch(host)) return null;
+    if (!host.contains('.') && host.toLowerCase() != 'localhost') return null;
+    return parsed;
+  }
+
+  static final RegExp _webScheme = RegExp(r'^https?://', caseSensitive: false);
+  static final RegExp _otherScheme = RegExp(r'^[A-Za-z][A-Za-z0-9+\-]*:');
+  static final RegExp _hostShape = RegExp(r'^[A-Za-z0-9.\-_]+$');
+
+  /// Every optional detail is assigned unconditionally, so clearing a field in
+  /// the editor really clears it.
   void update({
     String? courseId,
     int? weekday,
     int? startMinute,
     int? durationMinutes,
     String? title,
+    String? room,
+    String? teacher,
+    String? link,
+    String? notes,
   }) {
     if (courseId != null) this.courseId = courseId;
     if (weekday != null) this.weekday = clampWeekday(weekday);
@@ -175,6 +249,10 @@ class TimetableClass {
       this.durationMinutes = clampDuration(durationMinutes);
     }
     this.title = title?.trim().nullIfEmpty;
+    this.room = room?.trim().nullIfEmpty;
+    this.teacher = teacher?.trim().nullIfEmpty;
+    this.link = link?.trim().nullIfEmpty;
+    this.notes = notes?.trim().nullIfEmpty;
   }
 
   Map<String, dynamic> toJson() => withExtras({
@@ -184,6 +262,10 @@ class TimetableClass {
     'startMinute': startMinute,
     'durationMinutes': durationMinutes,
     'title': title,
+    'room': room,
+    'teacher': teacher,
+    'link': link,
+    'notes': notes,
   }, extra);
 
   factory TimetableClass.fromJson(Map<String, dynamic> json) => TimetableClass(
@@ -193,6 +275,10 @@ class TimetableClass {
     startMinute: (json['startMinute'] as num?)?.toInt() ?? 540,
     durationMinutes: (json['durationMinutes'] as num?)?.toInt() ?? 60,
     title: (json['title'] as String?)?.trim().nullIfEmpty,
+    room: (json['room'] as String?)?.trim().nullIfEmpty,
+    teacher: (json['teacher'] as String?)?.trim().nullIfEmpty,
+    link: (json['link'] as String?)?.trim().nullIfEmpty,
+    notes: (json['notes'] as String?)?.trim().nullIfEmpty,
     extra: extraFieldsOf(json, _known),
   );
 

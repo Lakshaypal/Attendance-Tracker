@@ -162,6 +162,120 @@ void main() {
     });
   });
 
+  group('venue, teacher, link and notes', () {
+    test('are stored, edited and cleared', () {
+      final store = AttendanceStore();
+      final course = store.saveCourse(code: 'AA101', name: 'Course');
+      final slot = store.saveTimetableClass(
+        courseId: course.id,
+        weekday: DateTime.monday,
+        startMinute: 600,
+        durationMinutes: 60,
+        room: ' AB3107 ',
+        teacher: 'Dr Someone',
+        link: 'https://meet.example.test/abc',
+        notes: 'Bring the lab manual',
+      );
+      expect(slot.room, 'AB3107', reason: 'whitespace is trimmed');
+      expect(slot.teacher, 'Dr Someone');
+      expect(slot.notes, 'Bring the lab manual');
+      expect(slot.hasDetails, isTrue);
+
+      // Blanking a field in the editor really clears it.
+      store.saveTimetableClass(
+        existing: slot,
+        courseId: course.id,
+        weekday: slot.weekday,
+        startMinute: slot.startMinute,
+        durationMinutes: slot.durationMinutes,
+        room: '',
+        teacher: '   ',
+      );
+      expect(slot.room, isNull);
+      expect(slot.teacher, isNull);
+      expect(slot.link, isNull, reason: 'omitted means cleared, not kept');
+      expect(slot.hasDetails, isFalse);
+    });
+
+    test('survive a save and reload', () async {
+      final dir = await Directory.systemTemp.createTemp('attendance-venue');
+      addTearDown(() => dir.delete(recursive: true));
+
+      final first = AttendanceStore(directory: dir);
+      await first.load();
+      final course = first.saveCourse(code: 'BB202', name: 'Course');
+      first.saveTimetableClass(
+        courseId: course.id,
+        weekday: DateTime.friday,
+        startMinute: 540,
+        durationMinutes: 60,
+        room: 'LW1-TF4',
+        teacher: 'DSKV',
+        link: 'meet.google.com/xyz',
+        notes: 'Online only',
+      );
+      await first.flush();
+
+      final second = AttendanceStore(directory: dir);
+      await second.load();
+      final restored = second.classesForWeekday(DateTime.friday).single;
+      expect(restored.room, 'LW1-TF4');
+      expect(restored.teacher, 'DSKV');
+      expect(restored.link, 'meet.google.com/xyz');
+      expect(restored.notes, 'Online only');
+    });
+
+    group('link sanitising', () {
+      TimetableClass withLink(String? value) => TimetableClass(
+        id: 'x',
+        courseId: 'c',
+        weekday: 1,
+        startMinute: 600,
+        durationMinutes: 60,
+        link: value,
+      );
+
+      test('a bare host is treated as https', () {
+        expect(
+          withLink('meet.google.com/abc').linkUri.toString(),
+          'https://meet.google.com/abc',
+        );
+      });
+
+      test('an explicit scheme is kept', () {
+        expect(
+          withLink('http://example.test/x').linkUri.toString(),
+          'http://example.test/x',
+        );
+      });
+
+      test('only http and https are ever openable', () {
+        // A synced or scanned timetable must not be able to hand the platform
+        // something like this. Note that naively prefixing https:// would turn
+        // the mailto case into a valid-looking web address.
+        expect(withLink('javascript:alert(1)').linkUri, isNull);
+        expect(withLink('file:///etc/passwd').linkUri, isNull);
+        expect(withLink('mailto:someone@example.test').linkUri, isNull);
+        expect(withLink('tel:+123456').linkUri, isNull);
+        expect(withLink('ftp://example.test/x').linkUri, isNull);
+      });
+
+      test('a host with a port is still treated as a web address', () {
+        expect(
+          withLink('example.test:8080/room').linkUri.toString(),
+          'https://example.test:8080/room',
+        );
+      });
+
+      test('junk resolves to null rather than a broken launch', () {
+        expect(withLink(null).linkUri, isNull);
+        expect(withLink('   ').linkUri, isNull);
+        expect(withLink('not a url').linkUri, isNull);
+        expect(withLink('hello').linkUri, isNull, reason: 'no dotted host');
+      });
+    });
+  });
+
   group('a longer class carries more weight', () {
     test('periodsFor rounds to the nearest whole period', () {
       expect(periodsFor(60, 60), 1);

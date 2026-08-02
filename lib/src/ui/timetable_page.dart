@@ -549,10 +549,13 @@ class _SlotBlock extends StatelessWidget {
                           color: subtleInk(context),
                         ),
                       ),
-                    if (roomy && slot.title != null)
+                    if (roomy && (slot.title != null || slot.room != null))
                       Expanded(
                         child: Text(
-                          slot.title!,
+                          [
+                            if (slot.title != null) slot.title!,
+                            if (slot.room != null) slot.room!,
+                          ].join(' · '),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -560,6 +563,15 @@ class _SlotBlock extends StatelessWidget {
                             height: 1.15,
                             color: subtleInk(context),
                           ),
+                        ),
+                      ),
+                    if (slot.linkUri != null && constraints.maxHeight >= 34)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Icon(
+                          Icons.link_rounded,
+                          size: 11,
+                          color: subtleInk(context),
                         ),
                       ),
                   ],

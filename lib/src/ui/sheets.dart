@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../civil_date.dart';
 import '../models.dart';
@@ -76,6 +77,10 @@ Future<void> showMarkSheet(
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (slot.hasDetails) ...[
+            _SlotDetails(slot: slot),
+            const SizedBox(height: 14),
+          ],
           for (final status in AttendanceStatus.values)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -107,6 +112,113 @@ Future<void> showMarkSheet(
       );
     },
   );
+}
+
+/// Venue, teacher, link and notes for one slot.
+class _SlotDetails extends StatelessWidget {
+  const _SlotDetails({required this.slot});
+
+  final TimetableClass slot;
+
+  @override
+  Widget build(BuildContext context) {
+    final uri = slot.linkUri;
+    return Container(
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (slot.room != null)
+            _DetailRow(icon: Icons.place_outlined, text: slot.room!),
+          if (slot.teacher != null)
+            _DetailRow(icon: Icons.person_outline_rounded, text: slot.teacher!),
+          if (slot.notes != null)
+            _DetailRow(icon: Icons.notes_rounded, text: slot.notes!),
+          if (slot.link != null) ...[
+            _DetailRow(
+              icon: Icons.link_rounded,
+              // The real destination is shown, never hidden behind a button.
+              text: uri?.toString() ?? slot.link!,
+              muted: uri == null,
+            ),
+            if (uri != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: OutlinedButton.icon(
+                  onPressed: () => openSlotLink(context, uri),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 17),
+                  label: const Text('Open link'),
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'This is not a web address, so it cannot be opened.',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({
+    required this.icon,
+    required this.text,
+    this.muted = false,
+  });
+
+  final IconData icon;
+  final String text;
+  final bool muted;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: subtleInk(context)),
+        const SizedBox(width: 9),
+        Expanded(
+          child: SelectableText(
+            text,
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.3,
+              color: muted ? subtleInk(context) : null,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Opens a slot's link in the browser, reporting failure rather than doing
+/// nothing.
+Future<void> openSlotLink(BuildContext context, Uri uri) async {
+  var opened = false;
+  try {
+    opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } catch (_) {
+    opened = false;
+  }
+  if (!context.mounted || opened) return;
+  showSnack(context, 'Could not open $uri');
 }
 
 class _StatusTile extends StatelessWidget {
@@ -261,6 +373,11 @@ Future<void> showSlotSheet(
   var start = slot?.startMinute ?? initialStartMinute ?? 9 * 60;
   var duration = slot?.durationMinutes ?? 60;
   final title = TextEditingController(text: slot?.title ?? '');
+  final room = TextEditingController(text: slot?.room ?? '');
+  final teacher = TextEditingController(text: slot?.teacher ?? '');
+  final link = TextEditingController(text: slot?.link ?? '');
+  final notes = TextEditingController(text: slot?.notes ?? '');
+  var showDetails = slot?.hasDetails ?? false;
 
   await showAppSheet<void>(
     context,
@@ -348,9 +465,63 @@ Future<void> showSlotSheet(
           controller: title,
           decoration: const InputDecoration(
             labelText: 'Label (optional)',
-            hintText: 'Lab, tutorial, room…',
+            hintText: 'Lab, tutorial…',
           ),
         ),
+        const SizedBox(height: 4),
+        if (!showDetails)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => setState(() => showDetails = true),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Add venue, teacher or link'),
+            ),
+          )
+        else ...[
+          const SizedBox(height: 8),
+          TextField(
+            controller: room,
+            textCapitalization: TextCapitalization.characters,
+            decoration: const InputDecoration(
+              labelText: 'Venue',
+              hintText: 'Room or lab',
+              prefixIcon: Icon(Icons.place_outlined),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: teacher,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: 'Teacher',
+              prefixIcon: Icon(Icons.person_outline_rounded),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: link,
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            decoration: const InputDecoration(
+              labelText: 'Link',
+              hintText: 'Meeting or course page',
+              prefixIcon: Icon(Icons.link_rounded),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: notes,
+            maxLines: 3,
+            minLines: 2,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
+              labelText: 'Notes',
+              hintText: 'Anything else worth remembering',
+              alignLabelWithHint: true,
+            ),
+          ),
+        ],
         const SizedBox(height: 18),
         FilledButton(
           onPressed: () {
@@ -361,6 +532,10 @@ Future<void> showSlotSheet(
               startMinute: start,
               durationMinutes: duration,
               title: title.text,
+              room: room.text,
+              teacher: teacher.text,
+              link: link.text,
+              notes: notes.text,
             );
             Navigator.pop(sheetContext);
           },
@@ -370,6 +545,10 @@ Future<void> showSlotSheet(
     ),
   );
   title.dispose();
+  room.dispose();
+  teacher.dispose();
+  link.dispose();
+  notes.dispose();
 }
 
 /// Add or edit a one-off record that is not tied to the weekly timetable.

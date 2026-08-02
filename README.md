@@ -20,6 +20,8 @@ Track class attendance **per subject**, see your week as a real grid, and build 
 
 **Attendance.** Reported **per subject only** — never a combined figure, because a college checks each subject against the threshold on its own. Each card gives the percentage, the mass-bunk-adjusted percentage, and the sentence you actually want: *"You can miss 3 more periods and stay above 75%"* or *"Attend the next 4 periods in a row to get back to 75%."* Subjects in trouble sort to the top. Nothing marked yet shows `—`, never a misleading 0%.
 
+**Class details.** Each weekly class can carry a venue, a teacher, a link and free-form notes. They show when you tap the class to mark it, the venue appears on the grid block and in the day list, and a link opens in your browser. Only `http` and `https` links are ever openable — a `file:` or `javascript:` link arriving through a synced or scanned timetable is shown but never launched.
+
 **Scan a timetable.** Photograph the printed grid; the app reads it on-device and shows you every class it found before anything is saved.
 
 ## How attendance is counted
@@ -129,7 +131,7 @@ lib/
     scan/                        OCR backends and the geometric grid parser
     update/                      version comparison and the GitHub release check
     ui/                          five tabs, sheets, onboarding, shared widgets
-test/                            142 tests
+test/                            153 tests
 tool/ocr_fixture/                regenerates the recorded OCR fixture
 ```
 
