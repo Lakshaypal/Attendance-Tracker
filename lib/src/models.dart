@@ -268,8 +268,22 @@ class AttendanceRecord {
       );
 }
 
+/// How many periods a class of [durationMinutes] is worth.
+///
+/// Attendance is counted in contact hours, not in sessions: a two-hour lab is
+/// two periods and moves the percentage twice as much as a one-hour lecture.
+/// Rounding to the nearest period keeps 55-minute and 60-minute timetables
+/// behaving identically, and a class is never worth less than one period.
+int periodsFor(int durationMinutes, int periodMinutes) {
+  if (periodMinutes <= 0) return 1;
+  final periods = (durationMinutes / periodMinutes).round();
+  return periods < 1 ? 1 : periods;
+}
+
 /// Everything the UI needs about one course, all of it derived in a single
 /// pass over the records when the store rebuilds its index.
+///
+/// Every count here is in **periods**, not sessions — see [periodsFor].
 class CourseStats {
   const CourseStats({
     required this.attended,
@@ -278,6 +292,7 @@ class CourseStats {
     required this.holidays,
     required this.scheduled,
     required this.markedScheduled,
+    this.markedSessions = 0,
   });
 
   static const empty = CourseStats(
@@ -293,6 +308,10 @@ class CourseStats {
   final int bunked;
   final int massBunked;
   final int holidays;
+
+  /// How many individual classes were marked, regardless of their length.
+  /// Only for wording like "12 classes marked" — never for the percentage.
+  final int markedSessions;
 
   /// Slot occurrences between the semester start and today, from the weekly
   /// timetable alone.

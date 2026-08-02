@@ -179,7 +179,7 @@ class _SubjectCard extends StatelessWidget {
                         Text(
                           stats.held == 0
                               ? 'Nothing marked yet'
-                              : '${stats.attended} of ${stats.held} classes held',
+                              : '${stats.attended} of ${stats.held} periods held',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -266,9 +266,11 @@ class _AdviceLine extends StatelessWidget {
         return (
           Icons.check_circle_outline_rounded,
           spare == 0
-              ? 'Exactly on target — the next miss drops you below $threshold%.'
-              : 'You can miss $spare more ${spare == 1 ? 'class' : 'classes'} '
-                    'and stay above ${threshold.round()}%.',
+              ? 'Exactly on target — the next miss drops you below '
+                    '${threshold.round()}%.'
+              : 'You can miss $spare more ${spare == 1 ? 'period' : 'periods'} '
+                    'and stay above ${threshold.round()}%. A two-hour class '
+                    'costs two.',
           const Color(0xFF18865A),
         );
       }(),
@@ -276,7 +278,7 @@ class _AdviceLine extends StatelessWidget {
         final needed = stats.classesNeeded(fraction);
         return (
           Icons.trending_up_rounded,
-          'Attend the next $needed ${needed == 1 ? 'class' : 'classes'} '
+          'Attend the next $needed ${needed == 1 ? 'period' : 'periods'} '
               'in a row to get back to ${threshold.round()}%.',
           const Color(0xFFD6353B),
         );
@@ -456,7 +458,7 @@ class SubjectDetailPage extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${records.length} marked',
+                  '${records.length} classes marked',
                   style: TextStyle(fontSize: 12, color: subtleInk(context)),
                 ),
               ],
@@ -538,7 +540,7 @@ class _BigStat extends StatelessWidget {
             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
           ),
           Text(
-            '$numerator of $denominator',
+            '$numerator of $denominator periods',
             style: TextStyle(fontSize: 12, color: subtleInk(context)),
           ),
           const SizedBox(height: 3),

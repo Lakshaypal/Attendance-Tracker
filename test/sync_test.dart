@@ -85,7 +85,9 @@ void main() {
       expect(host.findCourseByCode('OLD100'), isNull);
       final received = host.findCourseByCode('EE303')!;
       expect(host.classesForCourse(received.id), hasLength(1));
-      expect(host.statsFor(received.id).massBunked, 1);
+      // 90 minutes is one and a half periods, rounded to two.
+      expect(host.statsFor(received.id).massBunked, 2);
+      expect(host.statsFor(received.id).markedSessions, 1);
     });
 
     test(

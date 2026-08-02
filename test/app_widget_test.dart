@@ -181,6 +181,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Semester start'), findsOneWidget);
     expect(find.text('Attendance target'), findsOneWidget);
+    expect(find.text('Count by contact hours'), findsOneWidget);
+    expect(find.text('Length of one period'), findsOneWidget);
+
+    // The rules live further down the tab.
+    await tester.scrollUntilVisible(
+      find.text('How the percentages work'),
+      250,
+      scrollable: find.byType(Scrollable).last,
+    );
     expect(find.text('How the percentages work'), findsOneWidget);
   });
 

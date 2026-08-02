@@ -327,6 +327,30 @@ class _SettingsTab extends StatelessWidget {
               ),
               const Divider(height: 1),
               SwitchListTile(
+                secondary: const Icon(Icons.hourglass_bottom_rounded),
+                title: const Text('Count by contact hours'),
+                subtitle: Text(
+                  settings.countByPeriods
+                      ? 'A ${settings.periodMinutes}-minute class counts once, '
+                            'a two-hour class counts twice'
+                      : 'Every class counts once, however long it runs',
+                ),
+                value: settings.countByPeriods,
+                onChanged: (value) =>
+                    store.updateSettings(countByPeriods: value),
+              ),
+              if (settings.countByPeriods) ...[
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.timelapse_rounded),
+                  title: const Text('Length of one period'),
+                  subtitle: Text('${settings.periodMinutes} minutes'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => _editPeriodLength(context),
+                ),
+              ],
+              const Divider(height: 1),
+              SwitchListTile(
                 secondary: const Icon(Icons.weekend_rounded),
                 title: const Text('Show weekends in the grid'),
                 subtitle: const Text(
@@ -406,6 +430,40 @@ class _SettingsTab extends StatelessWidget {
           status: AttendanceStatus.govtHoliday,
           text: 'Removed from both figures — the class never happened.',
         ),
+        if (settings.countByPeriods)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.hourglass_bottom_rounded,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text.rich(
+                    const TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'Longer classes count more. ',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        TextSpan(
+                          text:
+                              'A two-hour lab moves the percentage twice as '
+                              'much as a one-hour lecture, on both sides of '
+                              'the fraction.',
+                        ),
+                      ],
+                    ),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+          ),
         const SizedBox(height: 12),
         InfoNote(
           text:
@@ -414,6 +472,49 @@ class _SettingsTab extends StatelessWidget {
               'affect any percentage until you mark them.',
         ),
       ],
+    );
+  }
+
+  Future<void> _editPeriodLength(BuildContext context) async {
+    var value = store.settings.periodMinutes;
+    await showAppSheet<void>(
+      context,
+      title: 'Length of one period',
+      subtitle:
+          'A class is worth its length divided by this, rounded to the '
+          'nearest whole period. Set it to match your timetable.',
+      builder: (sheetContext, setState) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              for (final option in const [45, 50, 55, 60, 90])
+                ChoiceChip(
+                  label: Text('$option min'),
+                  selected: value == option,
+                  onSelected: (_) => setState(() => value = option),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          InfoNote(
+            text:
+                'With $value-minute periods, a two-hour class counts as '
+                '${periodsFor(120, value)} and a one-hour class counts as '
+                '${periodsFor(60, value)}.',
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: () {
+              store.updateSettings(periodMinutes: value);
+              Navigator.pop(sheetContext);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
     );
   }
 

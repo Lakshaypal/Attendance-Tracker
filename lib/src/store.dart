@@ -15,6 +15,9 @@ class Settings {
     required this.semesterStartDay,
     this.thresholdPercent = 75,
     this.showWeekends = false,
+    this.countByPeriods = true,
+    this.periodMinutes = 60,
+    this.extra,
   });
 
   int semesterStartDay;
@@ -25,22 +28,56 @@ class Settings {
   /// Whether the timetable grid renders Saturday and Sunday columns.
   bool showWeekends;
 
+  /// When true (the usual convention), a class counts once per contact hour,
+  /// so a two-hour lab is worth two periods. Turn it off for an institution
+  /// that counts one mark per session however long it runs.
+  bool countByPeriods;
+
+  /// The length of one period, used to convert a class duration into periods.
+  int periodMinutes;
+
+  /// Settings written by a newer version of the app, carried through so an
+  /// older build cannot drop them.
+  final Map<String, dynamic>? extra;
+
+  static const Set<String> _known = {
+    'semesterStart',
+    'thresholdPercent',
+    'showWeekends',
+    'countByPeriods',
+    'periodMinutes',
+  };
+
   double get thresholdFraction => thresholdPercent / 100;
 
-  Map<String, dynamic> toJson() => {
+  /// The weight one class of [durationMinutes] carries.
+  int weightFor(int durationMinutes) =>
+      countByPeriods ? periodsFor(durationMinutes, periodMinutes) : 1;
+
+  Map<String, dynamic> toJson() => withExtras({
     'semesterStart': isoDateString(semesterStartDay),
     'thresholdPercent': thresholdPercent,
     'showWeekends': showWeekends,
-  };
+    'countByPeriods': countByPeriods,
+    'periodMinutes': periodMinutes,
+  }, extra);
 
   factory Settings.fromJson(Map<String, dynamic>? json) {
     final raw = (json?['thresholdPercent'] as num?)?.toDouble() ?? 75;
+    final period = (json?['periodMinutes'] as num?)?.toInt() ?? 60;
     return Settings(
       semesterStartDay:
           parseIsoDateToEpochDay(json?['semesterStart'] as String?) ??
           defaultSemesterStart,
       thresholdPercent: raw.clamp(1, 100).toDouble(),
       showWeekends: json?['showWeekends'] as bool? ?? false,
+      // Files written before periods existed counted one mark per session.
+      // Keeping that default for them would be wrong — the figures they
+      // already show are the ones being corrected — so weighting is on for
+      // everyone and the toggle is there for the rare college that differs.
+      countByPeriods: json?['countByPeriods'] as bool? ?? true,
+      periodMinutes: period.clamp(15, 240),
+      extra: json == null ? null : extraFieldsOf(json, _known),
     );
   }
 
@@ -55,6 +92,7 @@ class _Tally {
   int holidays = 0;
   int markedScheduled = 0;
   int scheduled = 0;
+  int markedSessions = 0;
 }
 
 /// The single source of truth.
@@ -328,7 +366,10 @@ class AttendanceStore extends ChangeNotifier {
     for (final item in _timetable) {
       final tally = tallies[item.courseId];
       if (tally == null) continue;
-      tally.scheduled += weekdayOccurrences(firstDay, lastDay, item.weekday);
+      // Weighted, so a two-hour lab contributes two periods per occurrence.
+      tally.scheduled +=
+          weekdayOccurrences(firstDay, lastDay, item.weekday) *
+          _settings.weightFor(item.durationMinutes);
     }
 
     // O(R)
@@ -343,6 +384,9 @@ class AttendanceStore extends ChangeNotifier {
       (_recordsByDay[record.epochDay] ??= <AttendanceRecord>[]).add(record);
       (_recordsByCourse[record.courseId] ??= <AttendanceRecord>[]).add(record);
 
+      // One mark on a two-hour class is worth two periods everywhere below.
+      final weight = _settings.weightFor(record.durationMinutes);
+
       final slotId = record.timetableClassId;
       if (slotId != null && _classById.containsKey(slotId)) {
         // `_normalize` guarantees at most one record per (slot, day), so this
@@ -351,23 +395,26 @@ class AttendanceStore extends ChangeNotifier {
                 <String, AttendanceRecord>{})[slotId] =
             record;
         if (record.epochDay >= firstDay && record.epochDay <= lastDay) {
-          tally.markedScheduled++;
+          tally.markedScheduled += weight;
         }
       }
 
+      tally.markedSessions++;
+      // Day summaries drive calendar dots, which are about "did anything
+      // happen", so they stay as plain session counts.
       final dayTally = dayTallies[record.epochDay] ??= _Tally();
       switch (record.status) {
         case AttendanceStatus.attended:
-          tally.attended++;
+          tally.attended += weight;
           dayTally.attended++;
         case AttendanceStatus.individualBunk:
-          tally.bunked++;
+          tally.bunked += weight;
           dayTally.bunked++;
         case AttendanceStatus.massBunk:
-          tally.massBunked++;
+          tally.massBunked += weight;
           dayTally.massBunked++;
         case AttendanceStatus.govtHoliday:
-          tally.holidays++;
+          tally.holidays += weight;
           dayTally.holidays++;
       }
     }
@@ -382,6 +429,7 @@ class AttendanceStore extends ChangeNotifier {
         holidays: tally.holidays,
         scheduled: tally.scheduled,
         markedScheduled: tally.markedScheduled,
+        markedSessions: tally.markedSessions,
       );
     }
 
@@ -442,6 +490,8 @@ class AttendanceStore extends ChangeNotifier {
     int? semesterStartDay,
     double? thresholdPercent,
     bool? showWeekends,
+    bool? countByPeriods,
+    int? periodMinutes,
   }) {
     if (semesterStartDay != null) {
       _settings.semesterStartDay = semesterStartDay;
@@ -450,6 +500,10 @@ class AttendanceStore extends ChangeNotifier {
       _settings.thresholdPercent = thresholdPercent.clamp(1, 100).toDouble();
     }
     if (showWeekends != null) _settings.showWeekends = showWeekends;
+    if (countByPeriods != null) _settings.countByPeriods = countByPeriods;
+    if (periodMinutes != null) {
+      _settings.periodMinutes = periodMinutes.clamp(15, 240);
+    }
     _touch();
   }
 

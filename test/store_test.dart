@@ -13,18 +13,26 @@ import 'package:flutter_test/flutter_test.dart';
 /// is exactly what the fast path avoids.
 CourseStats naiveStats(AttendanceStore store, String courseId) {
   var attended = 0, bunked = 0, massBunked = 0, holidays = 0;
+  // Worked out the long way: periods = duration / period length, rounded.
+  int weigh(int durationMinutes) => store.settings.countByPeriods
+      ? (durationMinutes / store.settings.periodMinutes).round().clamp(
+          1,
+          1 << 30,
+        )
+      : 1;
   for (final record in store.records) {
     if (record.courseId != courseId) continue;
     if (store.courseById(record.courseId) == null) continue;
+    final weight = weigh(record.durationMinutes);
     switch (record.status) {
       case AttendanceStatus.attended:
-        attended++;
+        attended += weight;
       case AttendanceStatus.individualBunk:
-        bunked++;
+        bunked += weight;
       case AttendanceStatus.massBunk:
-        massBunked++;
+        massBunked += weight;
       case AttendanceStatus.govtHoliday:
-        holidays++;
+        holidays += weight;
     }
   }
 
@@ -41,14 +49,14 @@ CourseStats naiveStats(AttendanceStore store, String courseId) {
       if (slot.weekday != weekday) continue;
       if (slot.courseId != courseId) continue;
       if (store.courseById(slot.courseId) == null) continue;
-      scheduled++;
+      scheduled += weigh(slot.durationMinutes);
       final hit = store.records.any(
         (record) =>
             record.epochDay == day &&
             record.timetableClassId == slot.id &&
             liveClassIds.contains(record.timetableClassId),
       );
-      if (hit) marked++;
+      if (hit) marked += weigh(slot.durationMinutes);
     }
   }
 
@@ -151,6 +159,203 @@ void main() {
         markedScheduled: 10,
       );
       expect(stats.classesNeeded(0.75), 0);
+    });
+  });
+
+  group('a longer class carries more weight', () {
+    test('periodsFor rounds to the nearest whole period', () {
+      expect(periodsFor(60, 60), 1);
+      expect(periodsFor(120, 60), 2);
+      expect(periodsFor(180, 60), 3);
+      // 55-minute periods are common; a "1 hour" slot is still one period.
+      expect(periodsFor(55, 60), 1);
+      expect(periodsFor(115, 60), 2);
+      expect(periodsFor(55, 55), 1);
+      expect(periodsFor(110, 55), 2);
+      // Never worth less than one, whatever the arithmetic says.
+      expect(periodsFor(10, 60), 1);
+      expect(periodsFor(60, 0), 1);
+    });
+
+    /// A course with one 1-hour lecture and one 2-hour lab in the same week.
+    AttendanceStore buildMixed() {
+      final store = AttendanceStore();
+      store.updateSettings(semesterStartDay: startOfWeek(todayEpochDay()));
+      final course = store.saveCourse(code: 'AA101', name: 'Mixed');
+      store.saveTimetableClass(
+        courseId: course.id,
+        weekday: DateTime.monday,
+        startMinute: 9 * 60,
+        durationMinutes: 60,
+      );
+      store.saveTimetableClass(
+        courseId: course.id,
+        weekday: DateTime.monday,
+        startMinute: 14 * 60,
+        durationMinutes: 120,
+      );
+      return store;
+    }
+
+    test('missing the two-hour lab costs twice a lecture', () {
+      final store = buildMixed();
+      final course = store.findCourseByCode('AA101')!;
+      final monday = startOfWeek(todayEpochDay());
+      final lecture = store
+          .classesForCourse(course.id)
+          .firstWhere((slot) => slot.durationMinutes == 60);
+      final lab = store
+          .classesForCourse(course.id)
+          .firstWhere((slot) => slot.durationMinutes == 120);
+
+      store.markSlot(
+        slot: lecture,
+        epochDay: monday,
+        status: AttendanceStatus.attended,
+      );
+      store.markSlot(
+        slot: lab,
+        epochDay: monday,
+        status: AttendanceStatus.individualBunk,
+      );
+
+      final stats = store.statsFor(course.id);
+      // 1 period attended out of 3 held — not 1 out of 2.
+      expect(stats.attended, 1);
+      expect(stats.bunked, 2);
+      expect(stats.held, 3);
+      expect(stats.percent, closeTo(33.33, 0.01));
+      expect(stats.markedSessions, 2, reason: 'still only two classes marked');
+    });
+
+    test('attending the lab is worth twice a lecture', () {
+      final store = buildMixed();
+      final course = store.findCourseByCode('AA101')!;
+      final monday = startOfWeek(todayEpochDay());
+      final lecture = store
+          .classesForCourse(course.id)
+          .firstWhere((slot) => slot.durationMinutes == 60);
+      final lab = store
+          .classesForCourse(course.id)
+          .firstWhere((slot) => slot.durationMinutes == 120);
+
+      store.markSlot(
+        slot: lab,
+        epochDay: monday,
+        status: AttendanceStatus.attended,
+      );
+      store.markSlot(
+        slot: lecture,
+        epochDay: monday,
+        status: AttendanceStatus.individualBunk,
+      );
+
+      final stats = store.statsFor(course.id);
+      expect(stats.attended, 2);
+      expect(stats.bunked, 1);
+      expect(stats.percent, closeTo(66.67, 0.01));
+    });
+
+    test('scheduled and unlogged counts are in periods too', () {
+      final store = buildMixed();
+      final course = store.findCourseByCode('AA101')!;
+      // One Monday has passed since the semester began, so three periods are
+      // scheduled: one lecture plus a two-period lab.
+      final stats = store.statsFor(course.id);
+      expect(stats.scheduled, 3);
+      expect(stats.pending, 3);
+    });
+
+    test('a holiday on the lab removes two periods, not one', () {
+      final store = buildMixed();
+      final course = store.findCourseByCode('AA101')!;
+      final monday = startOfWeek(todayEpochDay());
+      final lab = store
+          .classesForCourse(course.id)
+          .firstWhere((slot) => slot.durationMinutes == 120);
+      store.markSlot(
+        slot: lab,
+        epochDay: monday,
+        status: AttendanceStatus.govtHoliday,
+      );
+      final stats = store.statsFor(course.id);
+      expect(stats.holidays, 2);
+      expect(stats.held, 0, reason: 'a holiday never reaches the denominator');
+      expect(stats.percent, isNull);
+    });
+
+    test(
+      'the weighting can be turned off for a college that counts sessions',
+      () {
+        final store = buildMixed();
+        store.updateSettings(countByPeriods: false);
+        final course = store.findCourseByCode('AA101')!;
+        final monday = startOfWeek(todayEpochDay());
+        final lab = store
+            .classesForCourse(course.id)
+            .firstWhere((slot) => slot.durationMinutes == 120);
+        store.markSlot(
+          slot: lab,
+          epochDay: monday,
+          status: AttendanceStatus.attended,
+        );
+
+        final stats = store.statsFor(course.id);
+        expect(stats.attended, 1, reason: 'one session, not two periods');
+        expect(stats.scheduled, 2, reason: 'two sessions on the Monday');
+      },
+    );
+
+    test('a 55-minute timetable behaves the same as a 60-minute one', () {
+      final store = AttendanceStore();
+      store.updateSettings(
+        semesterStartDay: startOfWeek(todayEpochDay()),
+        periodMinutes: 55,
+      );
+      final course = store.saveCourse(code: 'BB202', name: 'Fifty-five');
+      final single = store.saveTimetableClass(
+        courseId: course.id,
+        weekday: DateTime.monday,
+        startMinute: 9 * 60,
+        durationMinutes: 55,
+      );
+      final double = store.saveTimetableClass(
+        courseId: course.id,
+        weekday: DateTime.monday,
+        startMinute: 11 * 60,
+        durationMinutes: 115,
+      );
+      final monday = startOfWeek(todayEpochDay());
+      store.markSlot(
+        slot: single,
+        epochDay: monday,
+        status: AttendanceStatus.attended,
+      );
+      store.markSlot(
+        slot: double,
+        epochDay: monday,
+        status: AttendanceStatus.individualBunk,
+      );
+
+      final stats = store.statsFor(course.id);
+      expect(stats.attended, 1);
+      expect(stats.bunked, 2);
+      expect(stats.percent, closeTo(33.33, 0.01));
+    });
+
+    test('the period length setting survives a reload', () async {
+      final dir = await Directory.systemTemp.createTemp('attendance-periods');
+      addTearDown(() => dir.delete(recursive: true));
+
+      final first = AttendanceStore(directory: dir);
+      await first.load();
+      first.updateSettings(periodMinutes: 55, countByPeriods: false);
+      await first.flush();
+
+      final second = AttendanceStore(directory: dir);
+      await second.load();
+      expect(second.settings.periodMinutes, 55);
+      expect(second.settings.countByPeriods, isFalse);
     });
   });
 
@@ -655,7 +860,9 @@ void main() {
         second.recordForSlot(restoredSlot.id, day)!.status,
         AttendanceStatus.massBunk,
       );
-      expect(second.statsFor(restored.id).massBunked, 1);
+      // A 90-minute class is one and a half periods, which rounds to two.
+      expect(second.statsFor(restored.id).massBunked, 2);
+      expect(second.statsFor(restored.id).markedSessions, 1);
 
       // A half-written main file must fall back to the backup rather than
       // dropping the semester on the floor.
@@ -664,7 +871,7 @@ void main() {
       await third.load();
       final recovered = third.findCourseByCode('ZZ999');
       expect(recovered, isNotNull);
-      expect(third.statsFor(recovered!.id).massBunked, 1);
+      expect(third.statsFor(recovered!.id).massBunked, 2);
     });
 
     test('an unreadable file still opens the app, on onboarding', () async {

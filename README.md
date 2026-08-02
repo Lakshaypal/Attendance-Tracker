@@ -18,9 +18,24 @@ Track class attendance **per subject**, see your week as a real grid, and build 
 
 **My subjects.** A printed timetable belongs to a whole class group, not to one student — the same 2 PM slot is one subject for you and another for the person beside you. So the app stores the *entire* timetable, including every option in every elective band, and this tab is where you say which ones are yours. Tick your compulsory subjects, pick one option per elective, or none. Everything else follows that choice.
 
-**Attendance.** Reported **per subject only** — never a combined figure, because a college checks each subject against the threshold on its own. Each card gives the percentage, the mass-bunk-adjusted percentage, and the sentence you actually want: *"You can miss 3 more classes and stay above 75%"* or *"Attend the next 4 in a row to get back to 75%."* Subjects in trouble sort to the top. Nothing marked yet shows `—`, never a misleading 0%.
+**Attendance.** Reported **per subject only** — never a combined figure, because a college checks each subject against the threshold on its own. Each card gives the percentage, the mass-bunk-adjusted percentage, and the sentence you actually want: *"You can miss 3 more periods and stay above 75%"* or *"Attend the next 4 periods in a row to get back to 75%."* Subjects in trouble sort to the top. Nothing marked yet shows `—`, never a misleading 0%.
 
 **Scan a timetable.** Photograph the printed grid; the app reads it on-device and shows you every class it found before anything is saved.
+
+## How attendance is counted
+
+| Status | Attendance | Adjusted attendance |
+| --- | --- | --- |
+| Attended | counts, present | counts, present |
+| Bunked | counts as an absence | counts as an absence |
+| Mass bunk | counts as an absence | removed entirely |
+| Holiday | removed entirely | removed entirely |
+
+**Longer classes count more.** Attendance is measured in **contact hours**, not sessions. A two-hour lab is two periods: attending adds two to the numerator, and it adds two to the denominator either way — so missing it costs twice what missing a one-hour lecture does. Counting both the same would quietly understate exactly the classes that matter most.
+
+Class length comes straight from the timetable. The period length is configurable under **Manage → Settings → Length of one period** (default 60 minutes), and lengths round to the nearest whole period, so a 55-minute timetable behaves identically. An institution that instead gives one mark per session however long it runs can turn the weighting off in the same place.
+
+Scheduled periods since the semester start that you have not marked show as **unlogged**. They do not move any percentage until you mark them.
 
 ## Install
 
@@ -114,7 +129,7 @@ lib/
     scan/                        OCR backends and the geometric grid parser
     update/                      version comparison and the GitHub release check
     ui/                          five tabs, sheets, onboarding, shared widgets
-test/                            135 tests
+test/                            142 tests
 tool/ocr_fixture/                regenerates the recorded OCR fixture
 ```
 
