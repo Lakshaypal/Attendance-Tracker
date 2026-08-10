@@ -45,7 +45,9 @@ Grab the assets from [the latest release](https://github.com/Lakshaypal/attendan
 
 **Android** — download the `.apk` and open it. You will need to allow installs from unknown sources. Builds are signed with a debug keystore, so this is a sideload, not a Play Store app.
 
-**macOS** — download the `.zip`, unzip, drag to Applications. The app is unsigned, so the first launch needs right-click → **Open** → Open. Once only.
+**macOS** — download the `.zip`, unzip, and drag the app to your Applications folder. Because the app is not signed with a paid Apple Developer certificate, macOS will quarantine it.
+- **Option 1 (Terminal, recommended)**: Open Terminal and run `xattr -cr "/Applications/Attendance Tracker.app"` to remove the quarantine flag. Then open the app normally.
+- **Option 2 (System Settings)**: Right-click the app and select **Open**. If macOS says the app is damaged or cannot be opened, go to **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**.
 
 ## Staying up to date
 
