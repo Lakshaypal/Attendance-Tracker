@@ -1,12 +1,12 @@
 # Attendance Tracker
 
-[![CI](https://github.com/Lakshaypal/attendance-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/Lakshaypal/attendance-tracker/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/Lakshaypal/attendance-tracker?sort=semver)](https://github.com/Lakshaypal/attendance-tracker/releases/latest)
+[![CI](https://github.com/Lakshaypal/Attendance-Tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/Lakshaypal/Attendance-Tracker/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/Lakshaypal/attendance-tracker?sort=semver)](https://github.com/Lakshaypal/Attendance-Tracker/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Track class attendance **per subject**, see your week as a real grid, and build your timetable by photographing the printed one. For macOS and Android. No account, no server — everything stays on your device.
 
-**[Download the latest release →](https://github.com/Lakshaypal/attendance-tracker/releases/latest)**
+**[Download the latest release →](https://github.com/Lakshaypal/Attendance-Tracker/releases/latest)**
 
 ---
 
@@ -41,7 +41,7 @@ Scheduled periods since the semester start that you have not marked show as **un
 
 ## Install
 
-Grab the assets from [the latest release](https://github.com/Lakshaypal/attendance-tracker/releases/latest).
+Grab the assets from [the latest release](https://github.com/Lakshaypal/Attendance-Tracker/releases/latest).
 
 **Android** — download the `.apk` and open it. You will need to allow installs from unknown sources. Builds are signed with a debug keystore, so this is a sideload, not a Play Store app.
 
